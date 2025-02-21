@@ -1,7 +1,10 @@
-from flask_mail import Message
-from app import mail
+from flask import current_app
 
-def send_verification_email(email):
-    msg = Message("Verify Your Email", sender="your_email@gmail.com", recipients=[email])
-    msg.body = "Your verification code is: 123456"
-    mail.send(msg)
+def send_verification_email(user_email):
+    mail = current_app.extensions['mail']  # Get mail instance from Flask app context
+    msg = mail.send_message(
+        subject="Verify Your Email",
+        recipients=[user_email],
+        body="Your verification code is 12345"
+    )
+    return msg
