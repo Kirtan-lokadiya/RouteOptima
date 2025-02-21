@@ -177,9 +177,10 @@
                         <td>{{ assignment['Time Utilization'] }}</td>
                         <td>{{ assignment['COV_UTI (Distance Utilization)'] }}</td>
                         <td>
-                            <a href="{{ url_for('show_map', timeslot=timeslot, index=loop.index0) }}" class="btn btn-primary btn-sm">
+                            <a href="{{ url_for('optimization.show_map', timeslot=timeslot, index=loop.index0) }}" class="btn btn-primary btn-sm">
                                 <i class="fas fa-map-marked-alt"></i> Show on Map
                             </a>
+                            
                         </td>
                     </tr>
                     {% endfor %}
