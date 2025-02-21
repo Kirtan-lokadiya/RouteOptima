@@ -1,5 +1,5 @@
 from flask_mail import Message
-from app import mail
+from extensions import mail
 
 def send_verification_email(email):
     msg = Message("Verify Your Email", sender="your_email@gmail.com", recipients=[email])

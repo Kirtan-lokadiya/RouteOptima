@@ -1,4 +1,5 @@
-from app import twilio_client, Config
+from extensions import twilio_client, mongo
+from config import Config
 
 def send_otp(mobile, otp):
     twilio_client.messages.create(

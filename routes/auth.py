@@ -1,8 +1,8 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from services.email_service import send_verification_email
 from services.sms_service import send_otp
-from services.hashing import hash_password, check_password
-from app import mongo
+from services.hashing import hash_password
+from extensions import mongo
 
 auth_bp = Blueprint('auth', __name__)
 
