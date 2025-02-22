@@ -1,7 +1,18 @@
-# from flask_mail import Message
-# from extensions import mail
+from flask_mail import Message
+from flask import current_app
+from flask_mail import Message
+from flask import current_app
+from flask_mail import Message
+from flask import current_app
 
-# def send_verification_email(email):
-#     msg = Message("Verify Your Email", sender="your_email@gmail.com", recipients=[email])
-#     msg.body = "Your verification code is: 123456"
-#     mail.send(msg)
+def send_email_otp(recipient, first_name, otp):
+    msg = Message("Email Verification OTP - SwiftRoute",
+                  sender=current_app.config['MAIL_USERNAME'],
+                  recipients=[recipient])
+    msg.body = (f"Hi {first_name},\n\n"
+                f"Your OTP for email verification is: {otp}\n\n"
+                "Please enter this OTP in the application to verify your email.\n"
+                "If you did not sign up, please ignore this message.")
+    from flask_mail import Mail
+    mail = Mail(current_app)
+    mail.send(msg)

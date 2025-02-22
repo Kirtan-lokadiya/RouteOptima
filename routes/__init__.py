@@ -1,1 +1,2 @@
-from .optimization import optimization_bp
+from routes.auth import auth_bp
+from routes.optimization import optimization_bp
