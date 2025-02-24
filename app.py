@@ -38,3 +38,4 @@ if __name__ == '__main__':
     # For HTTPS (development/testing): Create self-signed certs and uncomment the following line.
     # app.run(host="0.0.0.0", port=5000, ssl_context=('cert.pem', 'key.pem'))
     app.run(host="0.0.0.0", port=5000)
+
