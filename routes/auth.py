@@ -1,3 +1,4 @@
+# routes/auth.py
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
 from pymongo import MongoClient
 import random, string, bcrypt
@@ -9,12 +10,10 @@ from services.hashing import hash_password
 auth_bp = Blueprint('auth', __name__)
 
 def get_db():
-    # Connect to MongoDB Atlas using PyMongo.
     client = MongoClient(current_app.config["MONGO_URI"])
     db = client.get_default_database()  # Assumes the DB name is in the URI
     return db
 
-# --- Signup Route ---
 @auth_bp.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
@@ -76,7 +75,6 @@ def signup():
         return redirect(url_for('auth.verify_email_otp'))
     return render_template('signup.html')
 
-# --- Email OTP Verification Route ---
 @auth_bp.route('/verify_email_otp', methods=['GET', 'POST'])
 def verify_email_otp():
     if request.method == 'POST':
@@ -89,14 +87,13 @@ def verify_email_otp():
                 current_app.logger.info("Email verified for: %s", session.get('user_email'))
             else:
                 flash("Email already verified or user not found.", "info")
-            # After email is verified, redirect to mobile verification.
             return redirect(url_for('auth.verify_mobile'))
         else:
             flash("Invalid OTP. Please try again.", "danger")
             return redirect(url_for('auth.verify_email_otp'))
+    # IMPORTANT: Ensure the template name exactly matches your file.
     return render_template('verify_email_otp.html')
 
-# --- Mobile OTP Verification Route ---
 @auth_bp.route('/verify_mobile', methods=['GET', 'POST'])
 def verify_mobile():
     if request.method == 'POST':
@@ -110,7 +107,7 @@ def verify_mobile():
                 current_app.logger.info("Mobile verified for: %s", mobile)
             else:
                 flash("Mobile already verified or user not found.", "info")
-            # Check if both verifications are complete.
+            # If both verifications are complete, mark the session as verified.
             user = db.users.find_one({"email": session.get('user_email')})
             if user and user.get("email_verified") and user.get("mobile_verified"):
                 session['verified'] = True
@@ -121,9 +118,9 @@ def verify_mobile():
         else:
             flash("Invalid OTP. Please try again.", "danger")
             return redirect(url_for('auth.verify_mobile'))
-    return render_template('verify_mobile.html', verified=False)
-
-# --- Login Route ---
+    # If you have a separate template for mobile verification, use it (e.g., 'verify_mobile.html')
+    return render_template('verify_mobile.html')
+    
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -133,6 +130,8 @@ def login():
         user = db.users.find_one({"email": email})
         if user:
             if bcrypt.checkpw(password.encode('utf-8'), user["password"]):
+                session['verified'] = True  # Mark user as authenticated
+                session['user_email'] = email
                 flash("Logged in successfully!", "success")
                 current_app.logger.info("User logged in: %s", email)
                 return redirect(url_for('optimization.home'))
