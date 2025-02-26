@@ -141,3 +141,48 @@ def login():
             flash("User not found.", "danger")
         return redirect(url_for('auth.login'))
     return render_template('login.html')
+
+@auth_bp.route('/login/google')
+def login_google():
+    redirect_uri = url_for('auth.authorized', _external=True)
+    state = current_app.google.create_authorization_url(redirect_uri)['state']
+    session['oauth_state'] = state
+    return current_app.google.authorize_redirect(redirect_uri)
+
+@auth_bp.route('/authorized')
+def authorized():
+    if 'oauth_state' not in session or request.args.get('state') != session['oauth_state']:
+        flash("Invalid state parameter. Please try again.", "danger")
+        return redirect(url_for('auth.login'))
+    token = current_app.google.authorize_access_token()
+    resp = current_app.google.get('userinfo')
+    user_info = resp.json()
+    user_email = user_info['email']
+
+    db = get_db()
+    user = db.users.find_one({"email": user_email})
+    if not user:
+        # Create a new user if not exists
+        user_data = {
+            "first_name": user_info['given_name'],
+            "last_name": user_info['family_name'],
+            "email": user_email,
+            "mobile": "",
+            "password": "",  # No password for Google sign-in
+            "email_verified": True,
+            "mobile_verified": False
+        }
+        db.users.insert_one(user_data)
+        current_app.logger.info("New user created via Google: %s", user_email)
+
+    session['verified'] = True
+    session['user_email'] = user_email
+    session['user'] = user_info
+    flash("Logged in successfully with Google!", "success")
+    return redirect(url_for('optimization.home'))
+
+@auth_bp.route('/logout')
+def logout():
+    session.clear()
+    flash("Logged out successfully!", "success")
+    return redirect(url_for('auth.login'))
