@@ -1,30 +1,32 @@
-from flask import Blueprint, render_template, request, redirect, url_for, current_app
+# routes/optimization.py
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
 import pandas as pd
-import numpy as np
-import math
-import folium
 from utils.route_utils import (
-    haversine,
     insert_shop_location,
     calculate_distance_matrix_with_shop,
     assign_shipments,
     generate_map
 )
 
+# Import our custom login_required decorator
+from decorators import login_required
+
 optimization_bp = Blueprint('optimization', __name__)
 
-# Cache to store data in memory (in production, consider persistent caching)
+# In-memory cache (for production, consider a persistent cache)
 cache = {
     'excel_data': None,
     'assignments': {}
 }
 
 @optimization_bp.route('/')
+@login_required
 def home():
     current_app.logger.info("Home page accessed")
     return render_template('index.html')
 
 @optimization_bp.route('/upload', methods=['GET', 'POST'])
+@login_required
 def upload_file():
     if request.method == 'POST':
         if 'file' not in request.files:
@@ -43,6 +45,7 @@ def upload_file():
     return render_template('upload.html')
 
 @optimization_bp.route('/select_timeslot', methods=['GET', 'POST'])
+@login_required
 def select_timeslot():
     if request.method == 'POST':
         timeslot = request.form['timeslot']
@@ -50,6 +53,7 @@ def select_timeslot():
     return render_template('select_timeslot.html')
 
 @optimization_bp.route('/trips/<timeslot>')
+@login_required
 def show_trips(timeslot):
     shipments_df = cache.get('excel_data')
     if shipments_df is None:
@@ -59,7 +63,7 @@ def show_trips(timeslot):
     df_timeslot_with_shop = insert_shop_location(df_timeslot, store_lat, store_lon)
     dist_matrix = calculate_distance_matrix_with_shop(df_timeslot_with_shop)
     headers = ['Shop'] + df_timeslot['Shipment ID'].astype(str).tolist()
-    
+
     vehicles = [
         {"type": "3W", "count": 50, "capacity": 5, "max_radius": 15, "max_trip_time": 240},
         {"type": "4W-EV", "count": 25, "capacity": 8, "max_radius": 20, "max_trip_time": 300},
@@ -71,6 +75,7 @@ def show_trips(timeslot):
     return render_template('trips.html', assignments=assignments, timeslot=timeslot)
 
 @optimization_bp.route('/map/<timeslot>/<int:index>')
+@login_required
 def show_map(timeslot, index):
     shipments_df = cache.get('excel_data')
     assignments = cache.get('assignments', {}).get(timeslot, [])
