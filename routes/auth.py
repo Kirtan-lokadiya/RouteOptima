@@ -2,6 +2,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
 from pymongo import MongoClient
 import random, string, bcrypt
+import pyrebase
 
 from services.email_service import send_email_otp
 from services.sms_service import send_sms
@@ -9,7 +10,13 @@ from services.hashing import hash_password
 
 auth_bp = Blueprint('auth', __name__)
 
+def get_firebase():
+    """ Correctly initialize Firebase at runtime inside a request context """
+    firebase = pyrebase.initialize_app(current_app.config['FIREBASE_CONFIG'])
+    return firebase.auth()
+
 def get_db():
+    """ Get MongoDB connection """
     client = MongoClient(current_app.config["MONGO_URI"])
     db = client.get_default_database()  # Assumes the DB name is in the URI
     return db
@@ -75,52 +82,6 @@ def signup():
         return redirect(url_for('auth.verify_email_otp'))
     return render_template('signup.html')
 
-@auth_bp.route('/verify_email_otp', methods=['GET', 'POST'])
-def verify_email_otp():
-    if request.method == 'POST':
-        entered_otp = request.form.get('otp')
-        if entered_otp == session.get('email_otp'):
-            db = get_db()
-            result = db.users.update_one({"email": session.get('user_email')}, {"$set": {"email_verified": True}})
-            if result.modified_count:
-                flash("Email verified successfully!", "success")
-                current_app.logger.info("Email verified for: %s", session.get('user_email'))
-            else:
-                flash("Email already verified or user not found.", "info")
-            return redirect(url_for('auth.verify_mobile'))
-        else:
-            flash("Invalid OTP. Please try again.", "danger")
-            return redirect(url_for('auth.verify_email_otp'))
-    # IMPORTANT: Ensure the template name exactly matches your file.
-    return render_template('verify_email_otp.html')
-
-@auth_bp.route('/verify_mobile', methods=['GET', 'POST'])
-def verify_mobile():
-    if request.method == 'POST':
-        entered_otp = request.form.get('otp')
-        if entered_otp == session.get('mobile_otp'):
-            mobile = session.get('mobile')
-            db = get_db()
-            result = db.users.update_one({"mobile": mobile}, {"$set": {"mobile_verified": True}})
-            if result.modified_count:
-                flash("Mobile number verified successfully!", "success")
-                current_app.logger.info("Mobile verified for: %s", mobile)
-            else:
-                flash("Mobile already verified or user not found.", "info")
-            # If both verifications are complete, mark the session as verified.
-            user = db.users.find_one({"email": session.get('user_email')})
-            if user and user.get("email_verified") and user.get("mobile_verified"):
-                session['verified'] = True
-                return redirect(url_for('optimization.home'))
-            else:
-                flash("Please complete email verification as well.", "danger")
-                return redirect(url_for('auth.verify_email_otp'))
-        else:
-            flash("Invalid OTP. Please try again.", "danger")
-            return redirect(url_for('auth.verify_mobile'))
-    # If you have a separate template for mobile verification, use it (e.g., 'verify_mobile.html')
-    return render_template('verify_mobile.html')
-    
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -130,7 +91,7 @@ def login():
         user = db.users.find_one({"email": email})
         if user:
             if bcrypt.checkpw(password.encode('utf-8'), user["password"]):
-                session['verified'] = True  # Mark user as authenticated
+                session['verified'] = True
                 session['user_email'] = email
                 flash("Logged in successfully!", "success")
                 current_app.logger.info("User logged in: %s", email)
@@ -142,47 +103,48 @@ def login():
         return redirect(url_for('auth.login'))
     return render_template('login.html')
 
+### ✅ Fixed Google Sign-In via Firebase
 @auth_bp.route('/login/google')
 def login_google():
-    redirect_uri = url_for('auth.authorized', _external=True)
-    state = current_app.google.create_authorization_url(redirect_uri)['state']
-    session['oauth_state'] = state
-    return current_app.google.authorize_redirect(redirect_uri)
+    """ Redirect user to Google authentication page """
+    redirect_uri = "http://127.0.0.1:5000/auth/callback"
+    return redirect("https://accounts.google.com/o/oauth2/auth"
+                    "?client_id=" + current_app.config['GOOGLE_CLIENT_ID'] +
+                    "&redirect_uri=" + redirect_uri +
+                    "&scope=email profile openid"
+                    "&response_type=code")
 
-@auth_bp.route('/authorized')
-def authorized():
-    if 'oauth_state' not in session or request.args.get('state') != session['oauth_state']:
-        flash("Invalid state parameter. Please try again.", "danger")
+@auth_bp.route('/auth/callback')
+def auth_callback():
+    """ Handle Google OAuth callback and authenticate the user via Firebase """
+    code = request.args.get('code')
+    if not code:
+        flash("Google sign-in failed. Try again.", "danger")
         return redirect(url_for('auth.login'))
-    token = current_app.google.authorize_access_token()
-    resp = current_app.google.get('userinfo')
-    user_info = resp.json()
-    user_email = user_info['email']
 
-    db = get_db()
-    user = db.users.find_one({"email": user_email})
-    if not user:
-        # Create a new user if not exists
-        user_data = {
-            "first_name": user_info['given_name'],
-            "last_name": user_info['family_name'],
-            "email": user_email,
-            "mobile": "",
-            "password": "",  # No password for Google sign-in
-            "email_verified": True,
-            "mobile_verified": False
-        }
-        db.users.insert_one(user_data)
-        current_app.logger.info("New user created via Google: %s", user_email)
+    try:
+        firebase_auth = get_firebase()
 
-    session['verified'] = True
-    session['user_email'] = user_email
-    session['user'] = user_info
-    flash("Logged in successfully with Google!", "success")
-    return redirect(url_for('optimization.home'))
+        # Exchange authorization code for access token
+        token = firebase_auth.sign_in_with_custom_token(code)
+        user_info = firebase_auth.get_account_info(token['idToken'])['users'][0]
+
+        # Store user session
+        session['user_email'] = user_info['email']
+        session['user_name'] = user_info.get('displayName', 'User')
+        session['verified'] = True
+
+        flash("Google Sign-In Successful!", "success")
+        return redirect(url_for('optimization.home'))  # Redirect after login
+
+    except Exception as e:
+        current_app.logger.error(f"Google authentication failed: {e}")
+        flash("Authentication error. Please try again.", "danger")
+        return redirect(url_for('auth.login'))
 
 @auth_bp.route('/logout')
 def logout():
+    """ Clear session and log user out """
     session.clear()
     flash("Logged out successfully!", "success")
     return redirect(url_for('auth.login'))
