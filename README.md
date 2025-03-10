@@ -82,7 +82,10 @@ cd SwiftRoute-MINeD
 2. Create a virtual environment:
 ```bash
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+#for Linux
+ venv/bin/activate  
+#  For Windows:
+  venv\Scripts\activate
 ```
 
 3. Install dependencies:

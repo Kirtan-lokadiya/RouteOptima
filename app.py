@@ -1,15 +1,16 @@
 import logging
-from flask import Flask, session, redirect, url_for, request
+from flask import Flask
 from config import Config
+from routes import auth_bp, optimization_bp
 from flask_mail import Mail
 from flask_bcrypt import Bcrypt
-from authlib.integrations.flask_client import OAuth
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # Set up Logging
+    # ----- Set up Logging -----
+    # Configure a logger that logs to both console and a file.
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]',
@@ -20,51 +21,20 @@ def create_app():
     )
     app.logger.info("Application startup")
 
-    # Initialize Extensions
+    # ----- Initialize Extensions -----
+    # Flask-Mail for sending emails
     mail = Mail(app)
+    # Bcrypt for password hashing (you can also use our services/hashing.py)
     bcrypt = Bcrypt(app)
 
-    # Initialize OAuth
-    oauth = OAuth(app)
-    google = oauth.register(
-        'google',
-        client_id=app.config.get("GOOGLE_CLIENT_ID"),
-        client_secret=app.config.get("GOOGLE_CLIENT_SECRET"),
-        authorize_url='https://accounts.google.com/o/oauth2/auth',
-        access_token_url='https://accounts.google.com/o/oauth2/token',
-        client_kwargs={'scope': 'openid email profile https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile'},
-        redirect_uri='http://127.0.0.1:5000/authorized'
-    )
-
-    # Register blueprints
-    from routes.auth import auth_bp
-    from routes.optimization import optimization_bp
+    # ----- Register Blueprints -----
     app.register_blueprint(auth_bp)
     app.register_blueprint(optimization_bp)
-
-    # Add OAuth to app context
-    app.oauth = oauth
-    app.google = google
-
-    @app.route('/logout')
-    def logout():
-        session.clear()
-        return redirect(url_for('auth.login'))
-
-    @app.route('/authorized')
-    def authorized():
-        token = oauth.google.authorize_access_token()
-        user = oauth.google.parse_id_token(token)
-        session['user'] = user
-        return redirect('/')
-
-    @app.route('/login')
-    def login():
-        redirect_uri = url_for('authorized', _external=True)
-        return oauth.google.authorize_redirect(redirect_uri)
 
     return app
 
 if __name__ == '__main__':
     app = create_app()
-    app.run(host="0.0.0.0", port=5000)
+    # For HTTPS (development/testing): Create self-signed certs and uncomment the following line.
+    app.run(host="0.0.0.0", port=5000, ssl_context=('server.cert', 'server.key'))
+    # app.run(host="0.0.0.0", port=5000)
