@@ -127,3 +127,11 @@ http://localhost:5000
 | 🐼 Pandas | 2.1.4 |
 | 🔢 NumPy | 1.26.2 |
 | 🗺️ Folium | 0.15.1 |
+
+## Using Docker
+
+1. Start the application:
+```bash
+docker run -p 5000:5000 routeoptima
+```
+
