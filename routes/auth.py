@@ -55,15 +55,23 @@ def signup():
         email_otp = ''.join(random.choices(string.digits, k=6))
         session['email_otp'] = email_otp
         session['user_email'] = email
-        send_email_otp(email, "User", email_otp)
-        current_app.logger.info("Email OTP sent to: %s", email)
+        try:
+            send_email_otp(email, "User", email_otp)
+            current_app.logger.info("Email OTP sent to: %s", email)
+        except Exception as e:
+            current_app.logger.error("Failed to send email OTP: %s", e)
+            flash("Failed to send email OTP. Please check your email configuration.", "warning")
 
         # Generate and send OTP for mobile verification
         mobile_otp = ''.join(random.choices(string.digits, k=6))
         session['mobile_otp'] = mobile_otp
         session['mobile'] = request.form.get('mobile')
-        send_sms(session['mobile'], f"Your SwiftRoute OTP is {mobile_otp}")
-        current_app.logger.info("OTP sent to mobile: %s", session['mobile'])
+        try:
+            send_sms(session['mobile'], f"Your SwiftRoute OTP is {mobile_otp}")
+            current_app.logger.info("OTP sent to mobile: %s", session['mobile'])
+        except Exception as e:
+            current_app.logger.error("Failed to send mobile OTP: %s", e)
+            flash("Failed to send mobile OTP. Please check your mobile configuration.", "warning")
 
         flash("Signup successful! Please verify your email and mobile.", "success")
         return redirect(url_for('auth.verify_email_otp'))
@@ -81,7 +89,15 @@ def verify_email_otp():
                 current_app.logger.info("Email verified for: %s", session.get('user_email'))
             else:
                 flash("Email already verified or user not found.", "info")
-            return redirect(url_for('auth.verify_mobile'))
+
+            # Check if both email and mobile are verified
+            user = db.users.find_one({"email": session.get('user_email')})
+            if user and user.get("email_verified") and user.get("mobile_verified"):
+                session['verified'] = True
+                return redirect(url_for('optimization.home'))  # Redirect to the home page
+            else:
+                flash("Please complete mobile verification as well.", "danger")
+                return redirect(url_for('auth.verify_mobile'))
         else:
             flash("Invalid OTP. Please try again.", "danger")
             return redirect(url_for('auth.verify_email_otp'))
@@ -94,17 +110,18 @@ def verify_mobile():
         if entered_otp == session.get('mobile_otp'):
             mobile = session.get('mobile')
             db = get_db()
-            result = db.users.update_one({"mobile": mobile}, {"$set": {"mobile_verified": True}})
+            result = db.users.update_one({"email": session.get('user_email')}, {"$set": {"mobile_verified": True}})
             if result.modified_count:
                 flash("Mobile number verified successfully!", "success")
                 current_app.logger.info("Mobile verified for: %s", mobile)
             else:
                 flash("Mobile already verified or user not found.", "info")
-            # If both verifications are complete, mark the session as verified
+
+            # Check if both email and mobile are verified
             user = db.users.find_one({"email": session.get('user_email')})
             if user and user.get("email_verified") and user.get("mobile_verified"):
                 session['verified'] = True
-                return redirect(url_for('optimization.home'))
+                return redirect(url_for('optimization.home'))  # Redirect to the home page
             else:
                 flash("Please complete email verification as well.", "danger")
                 return redirect(url_for('auth.verify_email_otp'))
@@ -131,7 +148,6 @@ def login():
                 flash("Invalid password.", "danger")
         else:
             flash("User not found.", "danger")
-        return redirect(url_for('auth.login'))
     return render_template('login.html')
 
 @auth_bp.route('/logout')
