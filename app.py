@@ -10,7 +10,6 @@ def create_app():
     app.config.from_object(Config)
 
     # ----- Set up Logging -----
-    # Configure a logger that logs to both console and a file.
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]',
@@ -22,9 +21,7 @@ def create_app():
     app.logger.info("Application startup")
 
     # ----- Initialize Extensions -----
-    # Flask-Mail for sending emails
     mail = Mail(app)
-    # Bcrypt for password hashing (you can also use our services/hashing.py)
     bcrypt = Bcrypt(app)
 
     # ----- Register Blueprints -----
@@ -35,6 +32,6 @@ def create_app():
 
 if __name__ == '__main__':
     app = create_app()
-    # For HTTPS (development/testing): Create self-signed certs and uncomment the following line.
+# For HTTPS (development/testing): Create self-signed certs and uncomment the following line.
     app.run(host="0.0.0.0", port=5000, ssl_context=('server.cert', 'server.key'))
-    # app.run(host="0.0.0.0", port=5000)
+    #     app.run(host="0.0.0.0", port=5000)

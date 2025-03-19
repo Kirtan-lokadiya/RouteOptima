@@ -11,22 +11,19 @@ auth_bp = Blueprint('auth', __name__)
 
 def get_db():
     client = MongoClient(current_app.config["MONGO_URI"])
-    db = client.get_default_database()  # Assumes the DB name is in the URI
+    db = client.get_default_database()
     return db
 
 @auth_bp.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
         current_app.logger.info("Signup form submitted")
-        first_name = request.form.get('first_name')
-        last_name  = request.form.get('last_name')
-        email      = request.form.get('email')
-        mobile     = request.form.get('mobile')
-        password   = request.form.get('password')
+        email = request.form.get('email')
+        password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
 
-        # Basic validation.
-        if not all([first_name, last_name, email, mobile, password, confirm_password]):
+        # Basic validation
+        if not all([email, password, confirm_password]):
             flash("All fields are required", "danger")
             return redirect(url_for('auth.signup'))
         if password != confirm_password:
@@ -41,15 +38,12 @@ def signup():
             flash("Email already registered", "danger")
             return redirect(url_for('auth.signup'))
 
-        # Hash password.
+        # Hash password
         hashed_password = hash_password(password)
 
-        # Create user record.
+        # Create user record
         user_data = {
-            "first_name": first_name,
-            "last_name": last_name,
             "email": email,
-            "mobile": mobile,
             "password": hashed_password,
             "email_verified": False,
             "mobile_verified": False
@@ -57,19 +51,27 @@ def signup():
         db.users.insert_one(user_data)
         current_app.logger.info("User inserted into database: %s", email)
 
-        # Generate and send OTP for email verification.
+        # Generate and send OTP for email verification
         email_otp = ''.join(random.choices(string.digits, k=6))
         session['email_otp'] = email_otp
-        session['user_email'] = email  # To know which user to update
-        send_email_otp(email, first_name, email_otp)
-        current_app.logger.info("Email OTP sent to: %s", email)
+        session['user_email'] = email
+        try:
+            send_email_otp(email, "User", email_otp)
+            current_app.logger.info("Email OTP sent to: %s", email)
+        except Exception as e:
+            current_app.logger.error("Failed to send email OTP: %s", e)
+            flash("Failed to send email OTP. Please check your email configuration.", "warning")
 
-        # Generate and send OTP for mobile verification.
+        # Generate and send OTP for mobile verification
         mobile_otp = ''.join(random.choices(string.digits, k=6))
         session['mobile_otp'] = mobile_otp
-        session['mobile'] = mobile
-        send_sms(mobile, f"Your SwiftRoute OTP is {mobile_otp}")
-        current_app.logger.info("OTP sent to mobile: %s", mobile)
+        session['mobile'] = request.form.get('mobile')
+        try:
+            send_sms(session['mobile'], f"Your SwiftRoute OTP is {mobile_otp}")
+            current_app.logger.info("OTP sent to mobile: %s", session['mobile'])
+        except Exception as e:
+            current_app.logger.error("Failed to send mobile OTP: %s", e)
+            flash("Failed to send mobile OTP. Please check your mobile configuration.", "warning")
 
         flash("Signup successful! Please verify your email and mobile.", "success")
         return redirect(url_for('auth.verify_email_otp'))
@@ -87,11 +89,18 @@ def verify_email_otp():
                 current_app.logger.info("Email verified for: %s", session.get('user_email'))
             else:
                 flash("Email already verified or user not found.", "info")
-            return redirect(url_for('auth.verify_mobile'))
+
+            # Check if both email and mobile are verified
+            user = db.users.find_one({"email": session.get('user_email')})
+            if user and user.get("email_verified") and user.get("mobile_verified"):
+                session['verified'] = True
+                return redirect(url_for('optimization.home'))  # Redirect to the home page
+            else:
+                flash("Please complete mobile verification as well.", "danger")
+                return redirect(url_for('auth.verify_mobile'))
         else:
             flash("Invalid OTP. Please try again.", "danger")
             return redirect(url_for('auth.verify_email_otp'))
-    # IMPORTANT: Ensure the template name exactly matches your file.
     return render_template('verify_email_otp.html')
 
 @auth_bp.route('/verify_mobile', methods=['GET', 'POST'])
@@ -101,24 +110,24 @@ def verify_mobile():
         if entered_otp == session.get('mobile_otp'):
             mobile = session.get('mobile')
             db = get_db()
-            result = db.users.update_one({"mobile": mobile}, {"$set": {"mobile_verified": True}})
+            result = db.users.update_one({"email": session.get('user_email')}, {"$set": {"mobile_verified": True}})
             if result.modified_count:
                 flash("Mobile number verified successfully!", "success")
                 current_app.logger.info("Mobile verified for: %s", mobile)
             else:
                 flash("Mobile already verified or user not found.", "info")
-            # If both verifications are complete, mark the session as verified.
+
+            # Check if both email and mobile are verified
             user = db.users.find_one({"email": session.get('user_email')})
             if user and user.get("email_verified") and user.get("mobile_verified"):
                 session['verified'] = True
-                return redirect(url_for('optimization.home'))
+                return redirect(url_for('optimization.home'))  # Redirect to the home page
             else:
                 flash("Please complete email verification as well.", "danger")
                 return redirect(url_for('auth.verify_email_otp'))
         else:
             flash("Invalid OTP. Please try again.", "danger")
             return redirect(url_for('auth.verify_mobile'))
-    # If you have a separate template for mobile verification, use it (e.g., 'verify_mobile.html')
     return render_template('verify_mobile.html')
     
 @auth_bp.route('/login', methods=['GET', 'POST'])
@@ -130,7 +139,7 @@ def login():
         user = db.users.find_one({"email": email})
         if user:
             if bcrypt.checkpw(password.encode('utf-8'), user["password"]):
-                session['verified'] = True  # Mark user as authenticated
+                session['verified'] = True
                 session['user_email'] = email
                 flash("Logged in successfully!", "success")
                 current_app.logger.info("User logged in: %s", email)
@@ -139,47 +148,7 @@ def login():
                 flash("Invalid password.", "danger")
         else:
             flash("User not found.", "danger")
-        return redirect(url_for('auth.login'))
     return render_template('login.html')
-
-@auth_bp.route('/login/google')
-def login_google():
-    redirect_uri = url_for('auth.authorized', _external=True)
-    state = current_app.google.create_authorization_url(redirect_uri)['state']
-    session['oauth_state'] = state
-    return current_app.google.authorize_redirect(redirect_uri)
-
-@auth_bp.route('/authorized')
-def authorized():
-    if 'oauth_state' not in session or request.args.get('state') != session['oauth_state']:
-        flash("Invalid state parameter. Please try again.", "danger")
-        return redirect(url_for('auth.login'))
-    token = current_app.google.authorize_access_token()
-    resp = current_app.google.get('userinfo')
-    user_info = resp.json()
-    user_email = user_info['email']
-
-    db = get_db()
-    user = db.users.find_one({"email": user_email})
-    if not user:
-        # Create a new user if not exists
-        user_data = {
-            "first_name": user_info['given_name'],
-            "last_name": user_info['family_name'],
-            "email": user_email,
-            "mobile": "",
-            "password": "",  # No password for Google sign-in
-            "email_verified": True,
-            "mobile_verified": False
-        }
-        db.users.insert_one(user_data)
-        current_app.logger.info("New user created via Google: %s", user_email)
-
-    session['verified'] = True
-    session['user_email'] = user_email
-    session['user'] = user_info
-    flash("Logged in successfully with Google!", "success")
-    return redirect(url_for('optimization.home'))
 
 @auth_bp.route('/logout')
 def logout():
