@@ -134,4 +134,10 @@ http://localhost:5000
 ```bash
 docker run -p 5000:5000 routeoptima
 ```
+## For Test
+
+
+```bash
+pytest
+```
 
