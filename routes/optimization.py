@@ -10,6 +10,7 @@ from utils.route_utils import (
 
 # Import our custom login_required decorator
 from decorators import login_required
+from decorators import token_required
 
 optimization_bp = Blueprint('optimization', __name__)
 
@@ -20,13 +21,14 @@ cache = {
 }
 
 @optimization_bp.route('/')
-@login_required
+#@login_required
+# @token_required
 def home():
     current_app.logger.info("Home page accessed")
     return render_template('index.html')
 
 @optimization_bp.route('/upload', methods=['GET', 'POST'])
-@login_required
+#@login_required
 def upload_file():
     if request.method == 'POST':
         if 'file' not in request.files:
@@ -45,7 +47,7 @@ def upload_file():
     return render_template('upload.html')
 
 @optimization_bp.route('/select_timeslot', methods=['GET', 'POST'])
-@login_required
+#@login_required
 def select_timeslot():
     if request.method == 'POST':
         timeslot = request.form['timeslot']
@@ -53,7 +55,7 @@ def select_timeslot():
     return render_template('select_timeslot.html')
 
 @optimization_bp.route('/trips/<timeslot>')
-@login_required
+#@login_required
 def show_trips(timeslot):
     shipments_df = cache.get('excel_data')
     if shipments_df is None:
@@ -75,7 +77,7 @@ def show_trips(timeslot):
     return render_template('trips.html', assignments=assignments, timeslot=timeslot)
 
 @optimization_bp.route('/map/<timeslot>/<int:index>')
-@login_required
+#@login_required
 def show_map(timeslot, index):
     shipments_df = cache.get('excel_data')
     assignments = cache.get('assignments', {}).get(timeslot, [])
