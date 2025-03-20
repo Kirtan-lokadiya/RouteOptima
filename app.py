@@ -30,8 +30,14 @@ def create_app():
 
     return app
 
+import os
+
 if __name__ == '__main__':
     app = create_app()
-# For HTTPS (development/testing): Create self-signed certs and uncomment the following line.
-    app.run(host="0.0.0.0", port=5000, ssl_context=('server.cert', 'server.key'))
-    #     app.run(host="0.0.0.0", port=5000)
+    # for https
+    # if os.getenv('USE_SSL', 'true').lower() == 'true':
+    # for http
+    if os.getenv('USE_SSL', 'false').lower() == 'true':
+        app.run(host="0.0.0.0", port=5000, ssl_context=('server.cert', 'server.key'))
+    else:
+        app.run(host="0.0.0.0", port=5000)
