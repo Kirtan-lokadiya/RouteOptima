@@ -11,9 +11,8 @@
 
 ## 🌐 Live Demo of the Project
 
-Try out the live application: [SwiftRoute Demo](https://swiftroute.onrender.com)
+Try out the live application: [RouteOptima Demo](https://routeoptima.onrender.com)
 
-[![Deployment Status](https://img.shields.io/website?url=https%3A%2F%2Fswiftroute.onrender.com&logo=render&label=SwiftRoute)](https://swiftroute.onrender.com)
 
 Deployed on [Render](https://render.com/) with automatic deployments from GitHub.
 
@@ -75,16 +74,12 @@ The project addresses several key challenges in last-mile delivery optimization:
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/MayankSavaliya/SwiftRoute-MINeD.git
-cd SwiftRoute-MINeD
+git clone https://github.com/Kirtan-lokadiya/RouteOptima
+cd RouteOptima
 ```
 
 2. Create a virtual environment:
-<<<<<<< HEAD
 ```bash
-=======
-```bash 
->>>>>>> Kirtan
 python3 -m venv venv
 #for Linux
 source venv/bin/activate  

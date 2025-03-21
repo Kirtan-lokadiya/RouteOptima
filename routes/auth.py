@@ -67,7 +67,7 @@ def signup():
         session['mobile_otp'] = mobile_otp
         session['mobile'] = request.form.get('mobile')
         try:
-            send_sms(session['mobile'], f"Your SwiftRoute OTP is {mobile_otp}")
+            send_sms(session['mobile'], f"Your RouteOptima OTP is {mobile_otp}")
             current_app.logger.info("OTP sent to mobile: %s", session['mobile'])
         except Exception as e:
             current_app.logger.error("Failed to send mobile OTP: %s", e)

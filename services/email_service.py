@@ -6,7 +6,7 @@ from flask_mail import Message
 from flask import current_app
 
 def send_email_otp(recipient, first_name, otp):
-    msg = Message("Email Verification OTP - SwiftRoute",
+    msg = Message("Email Verification OTP - RouteOptima",
                   sender=current_app.config['MAIL_USERNAME'],
                   recipients=[recipient])
     msg.body = (f"Hi {first_name},\n\n"
