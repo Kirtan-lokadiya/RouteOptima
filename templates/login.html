@@ -37,7 +37,7 @@
             throw new Error("Firebase token is undefined.");
           }
 
-          const response = await fetch("http://localhost:5050/auth/google", {
+          const response = await fetch("https://googlesignin-production.up.railway.app/auth/google", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
